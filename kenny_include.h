@@ -13,6 +13,13 @@ long double get_time();
 long double get_second_time();
 long double get_microsecond_time();
 
+template<typename T> int sgn(T val) {
+    // https://stackoverflow.com/questions/1903954/is-there-a-standard-sign-function-signum-sgn-in-c-c
+    // If the first is true, then we return 1.
+    // If the second is true, then we return -1.
+    // If neither is true, then we return 0.
+    return (T(0) < val) - (val < T(0));
+}
 
 long double get_second_time(){
     struct timeval time;
