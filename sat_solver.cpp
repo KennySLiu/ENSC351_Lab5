@@ -152,7 +152,9 @@ int main(int argc, char *argv[]){
     //      If it's TRUE, great. you're done. 
     //      If it's FALSE, backtrack and switch your previous choice to false. Then continue on in the same way.
     for (int i = 1; i < sat_variables.size(); ++i){
-        sat_variables[i] = 1;
+        if (sat_variables[i] == 0){
+            sat_variables[i] = 1;
+        }
 
         int satisfied = check_satisfied(clause_vect, sat_variables);
         if (satisfied == 1){
@@ -177,6 +179,7 @@ int main(int argc, char *argv[]){
                     sat_variables[j] = 1;
                 }
                 if (sat_variables[j] == 1){
+                    i = --j;
                     sat_variables[j] = -1;
                     break;
                 }
