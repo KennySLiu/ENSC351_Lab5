@@ -133,7 +133,7 @@ int main(int argc, char *argv[]){
     vector<vector<int> > clause_vect = inputs.first;
     int num_vars = inputs.second;
 
-    /*
+    
     // DEBUGGING THE INPUT READER: 
     for (int i = 0; i < clause_vect.size(); ++i){
         for (int j = 0; j < clause_vect[i].size(); ++j){
@@ -141,8 +141,8 @@ int main(int argc, char *argv[]){
         }
         cout << endl;
     }
-    cout << num_vars << endl; 
-    */
+    cout << "and num_vars = " << num_vars << endl << endl; 
+    
 
     // sat_variables will be our vector which holds each variable's value. 0 means unset, -1 means false, 1 means true.
     // Index i will correspond to variable i in the input; hence sat_variables[0] doesn't represent anything.
@@ -173,14 +173,37 @@ int main(int argc, char *argv[]){
             continue;
         } else if (satisfied == -1){
             // If it's not satisfied, we backtrack until we find the last decision we made to set something true, and change that to false.
-            // All other entries BEFORE then will be set true.
-            for (int j = i; j > 0; --j){
-                if (sat_variables[j] == -1){
+            // All other entries we have decided on before then will be set true.
+            for (int j = sat_variables.size() - 1; j > 0; --j){
+                if (sat_variables[j] == 0){
+                    // If the variable is 0, then we haven't seen it yet. Just leave it alone.
+                    continue;
+                } else if (sat_variables[j] == -1){
                     sat_variables[j] = 1;
+                    continue;
                 }
                 if (sat_variables[j] == 1){
-                    i = --j;
+                    // Set i = j - 1 because it'll get incremented in the next loop step. If we set i = j, it'll return early (i.e. if i = last entry)
+                    i = j - 1;
                     sat_variables[j] = -1;
+
+                    // We also need to check if j = end of vector AND if everything is -1, because then we would have traversed the whole tree.
+                    // (First set the first entry to -1, so we can check if everything is equal)
+                    if ( j = sat_variables.size() - 1){
+                        bool no_solutions = 1;
+                        for (int k = 1; k < sat_variables.size(); ++k){
+                            if (sat_variables[k] != sat_variables[1]){
+                                no_solutions = 0;
+                                break;
+                            }
+                        }
+                        if (no_solutions){
+                            cout << "NO SOLUTIONS FOUND!" << endl;
+                            exit(0);
+                        }
+                    }
+
+                    // Break, because we backtracked successfully.
                     break;
                 }
             }

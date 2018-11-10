@@ -1,0 +1,9 @@
+c hi
+c this is from cpsc320 at ubc.
+c http://blogs.ubc.ca/cpsc3202016w2/files/2017/03/2017-03-15-reductions-sample-soln.pdf
+p cnf 5 5
+1 -2 3 4 0
+5 0
+-1 0
+2 -3 -5 0
+-2 3 0
