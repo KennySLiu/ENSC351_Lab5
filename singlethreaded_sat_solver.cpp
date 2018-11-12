@@ -25,6 +25,7 @@ pair<vector<vector<int> >, int> input_reader(char* filename){
         while (getline(in_file, cur_line)){
             char cstr_cur_line[cur_line.size() + 1];
             char* cstr_tok;
+            bool valid_line = 0;
             vector<int> curr_clause;
 
             // Skip over commented lines 
@@ -49,13 +50,16 @@ pair<vector<vector<int> >, int> input_reader(char* filename){
                 while (cstr_tok != NULL){
                     num = atoi(cstr_tok);
                     if (num == 0){
+                        valid_line = 1;
                         break;
                     }
                     curr_clause.push_back(num);
                     cstr_tok = strtok(NULL, " ");
                 }
-
-                clause_vect.push_back(curr_clause);
+                
+                if (valid_line){
+                    clause_vect.push_back(curr_clause);
+                } 
             }
         }
     } else {

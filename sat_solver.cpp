@@ -8,6 +8,7 @@
 #include <utility>
 #include <algorithm>
 #include <cmath>
+#include <csignal>
 #include <vector>
 #include <bitset>
 #include <cerrno>
@@ -20,7 +21,11 @@ bool SOLUTION_FOUND = 0;
 int num_backtracks = 0;
 pthread_mutex_t num_backtracks_lock;
 
-
+void signalHandler( int signum ){
+    // handle stuff here
+    alarm(2);
+    cout << "Backtracks so far = " << num_backtracks << endl;
+}
 
 pair<vector<vector<int> >, int> input_reader(char* filename){
     ifstream in_file;
@@ -35,6 +40,7 @@ pair<vector<vector<int> >, int> input_reader(char* filename){
         while (getline(in_file, cur_line)){
             char cstr_cur_line[cur_line.size() + 1];
             char* cstr_tok;
+            bool valid_line = 0;
             vector<int> curr_clause;
 
             // Skip over commented lines 
@@ -59,13 +65,16 @@ pair<vector<vector<int> >, int> input_reader(char* filename){
                 while (cstr_tok != NULL){
                     num = atoi(cstr_tok);
                     if (num == 0){
+                        valid_line = 1;
                         break;
                     }
                     curr_clause.push_back(num);
                     cstr_tok = strtok(NULL, " ");
                 }
-
-                clause_vect.push_back(curr_clause);
+                
+                if (valid_line){
+                    clause_vect.push_back(curr_clause);
+                }
             }
         }
     } else {
@@ -153,7 +162,7 @@ void* threaded_backtracker(void* vp_input){
             // If we found a solution, we don't want any other threads that may have found a solution to output concurrently. 
             //      So to solve this, we lock the solution found lock and just don't release it (since the program will exit shortly)
             pthread_mutex_lock(&sol_found_lock);
-            cout << "\n\n\n\nv ";
+            cout << "v ";
             for (int j = 1; j < sat_variables.size(); ++j){
                 if (sgn(sat_variables[j]) == -1){ 
                     cout << -j << " ";
@@ -200,7 +209,7 @@ void* threaded_backtracker(void* vp_input){
                             }
                         }
                         if (no_solutions){
-                            cout << "NO SOLUTIONS FOUND!" << endl;
+                            //cout << "NO SOLUTIONS FOUND!" << endl;
                             return 0;
                         }
                     }
@@ -221,6 +230,7 @@ int main(int argc, char *argv[]){
         return 1;
     }
 
+    signal(SIGALRM, signalHandler);
     SOLUTION_FOUND = 0;
     char* filename = argv[1];
     pair<vector<vector<int> >, int> inputs = input_reader(filename);
@@ -274,21 +284,27 @@ int main(int argc, char *argv[]){
     }
 
     for (int i = 0; i < NUM_THREADS; ++i){
-        
+
+        /*
         // DEBUGGING: making sure the sat_variables were built correctly
         cout << "i = " << i << endl;
         for (int j = 0; j < sat_variables[i].size(); ++j){
             cout << sat_variables[i][j];
         }
         cout << endl;
+        // END OF DEBUGGING to make sure the sat variables were built correctly
+        */
+
         pair< vector<int>, vector< vector< int> > >* threaded_backtracer_input = new pair< vector<int>, vector< vector< int> > >(sat_variables[i], clause_vect);
         pthread_create( &threads[i], NULL, threaded_backtracker, static_cast<void*>(threaded_backtracer_input) );
     }
-    cout << "PARENT: All threads created" << endl;
+    //cout << "PARENT: All threads created" << endl;
     
     
     int num_threads_joined = 0;
     vector<int> joined_thread_ids;
+
+    alarm(2);
     while (!SOLUTION_FOUND){
         for (int i = 0; i < NUM_THREADS; ++i){
             if ( find( joined_thread_ids.begin(), joined_thread_ids.end(), i ) != joined_thread_ids.end() ){
@@ -299,11 +315,12 @@ int main(int argc, char *argv[]){
             if (join != EBUSY && join != EINVAL && join != ESRCH){
                 ++num_threads_joined;
                 joined_thread_ids.push_back(i);
-                cout << "PARENT: Someone joined" << endl;
+                //cout << "PARENT: Someone joined" << endl;
             }
         }
 
         if (num_threads_joined == NUM_THREADS){
+            alarm(0);
             cout << "PARENT: No solutions found." << endl;
             exit(0);
         }

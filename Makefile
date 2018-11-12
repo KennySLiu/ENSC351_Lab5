@@ -1,9 +1,9 @@
 singlethread:
 	g++ -std=c++11 -g -o singlethreaded_SATsolver ./singlethreaded_sat_solver.cpp 
-	cp SATsolver ./test_files
+	cp singlethreaded_SATsolver ./test_files
 
 multithread:
-	g++ -std=c++11 -g -o SATsolver ./sat_solver.cpp
+	g++ -std=c++11 -g -o SATsolver -pthread ./sat_solver.cpp
 	cp SATsolver ./test_files
 
 clean:
