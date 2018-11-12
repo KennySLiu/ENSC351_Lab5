@@ -17,7 +17,8 @@
 using namespace std;
 pthread_mutex_t sol_found_lock;
 bool SOLUTION_FOUND = 0;
-
+int num_backtracks = 0;
+pthread_mutex_t num_backtracks_lock;
 
 
 
@@ -181,6 +182,12 @@ void* threaded_backtracker(void* vp_input){
                     // Set i = j - 1 because it'll get incremented in the next loop step. If we set i = j, it could return early (i.e. if i = last entry)
                     i = j - 1;
                     sat_variables[j] = -1;
+                    
+                    // We just backtracked once, so increment the number of backtracks: 
+                    pthread_mutex_lock(&num_backtracks_lock);
+                    ++num_backtracks;
+                    pthread_mutex_unlock(&num_backtracks_lock);
+                    
 
                     // We also need to check if we are done traversing all possibilities, because that means this current thread was unable to find a solution.
                     // To do this, check if j = end of vector AND if everything is equal (besides the first three predefined vals, and the dummy at [0]).
@@ -281,13 +288,24 @@ int main(int argc, char *argv[]){
     
     
     int num_threads_joined = 0;
+    vector<int> joined_thread_ids;
     while (!SOLUTION_FOUND){
         for (int i = 0; i < NUM_THREADS; ++i){
+            if ( find( joined_thread_ids.begin(), joined_thread_ids.end(), i ) != joined_thread_ids.end() ){
+                continue;
+            }
+
             int join = pthread_tryjoin_np(threads[i], NULL);
-            if (join != EBUSY){
+            if (join != EBUSY && join != EINVAL && join != ESRCH){
                 ++num_threads_joined;
+                joined_thread_ids.push_back(i);
                 cout << "PARENT: Someone joined" << endl;
             }
+        }
+
+        if (num_threads_joined == NUM_THREADS){
+            cout << "PARENT: No solutions found." << endl;
+            exit(0);
         }
     }
     // If solution_found was set to true, the thread that found a solution will have outputted everything already.
