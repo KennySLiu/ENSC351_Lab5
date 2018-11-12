@@ -9,17 +9,8 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
-#include <bitset>
-#include <cerrno>
-#define NUM_THREADS 8
-// NUM_THREADS MUST NOT BE CHANGED! It must be 8, because quite a bit of logic depends on it being specifically 8. 
 
 using namespace std;
-pthread_mutex_t sol_found_lock;
-bool SOLUTION_FOUND = 0;
-
-
-
 
 pair<vector<vector<int> >, int> input_reader(char* filename){
     ifstream in_file;
@@ -131,28 +122,44 @@ int check_satisfied(vector<vector<int> > clause_vect, vector<int> sat_variables)
 }
 
 
-void* threaded_backtracker(void* vp_input){
+int main(int argc, char *argv[]){
+    if (argc != 2){
+        cout << "\nTo use this program, call it along with the name of the input file. For example, ./sat_solve problem1\n";
+        return 1;
+    }
+    char* filename = argv[1];
+    pair<vector<vector<int> >, int> inputs = input_reader(filename);
 
-    pair<vector<int>, vector<vector<int> > > input = *static_cast<pair<vector<int>, vector<vector<int> > >* >(vp_input);
-    vector<int> sat_variables = input.first;
-    vector<vector<int> > clause_vect = input.second;
+    vector<vector<int> > clause_vect = inputs.first;
+    int num_vars = inputs.second;
 
+    
+    // DEBUGGING THE INPUT READER: 
+    for (int i = 0; i < clause_vect.size(); ++i){
+        for (int j = 0; j < clause_vect[i].size(); ++j){
+            cout << clause_vect[i][j] << ", ";
+        }
+        cout << endl;
+    }
+    cout << "and num_vars = " << num_vars << endl << endl; 
+    
+
+    // sat_variables will be our vector which holds each variable's value. 0 means unset, -1 means false, 1 means true.
+    // Index i will correspond to variable i in the input; hence sat_variables[0] doesn't represent anything.
+    vector<int> sat_variables(num_vars + 1, 0);
+    
     // Algorithm: for each variable, first set it to true. If that does not fail any clauses, then set the next variable to true. Continue on in this way until you get a TRUE or FALSE final result.
     //      If it's TRUE, great. you're done. 
     //      If it's FALSE, backtrack and switch your previous choice to false. Then continue on in the same way.
-    // We start at i = 4 because we we assume 8 threads. Thus, the first three choices are predefined for each thread.
-    for (int i = 4; i < sat_variables.size(); ++i){
+    for (int i = 1; i < sat_variables.size(); ++i){
         if (sat_variables[i] == 0){
             sat_variables[i] = 1;
         }
 
         int satisfied = check_satisfied(clause_vect, sat_variables);
         if (satisfied == 1){
-            // SUCCESS!
-            // If we found a solution, we don't want any other threads that may have found a solution to output concurrently. 
-            //      So to solve this, we lock the solution found lock and just don't release it (since the program will exit shortly)
-            pthread_mutex_lock(&sol_found_lock);
-            cout << "\n\n\n\nv ";
+            /* success! */
+            cout << "v ";
             for (int j = 1; j < sat_variables.size(); ++j){
                 if (sgn(sat_variables[j]) == -1){ 
                     cout << -j << " ";
@@ -161,15 +168,13 @@ void* threaded_backtracker(void* vp_input){
                 }
             }
             cout << endl;
-            // Set the SOLUTION_FOUND flag AFTER we cout everything, because otherwise we might kill the program early
-            SOLUTION_FOUND = 1;
-            return 0;
+            break;
         } else if (satisfied == 0){
             continue;
         } else if (satisfied == -1){
             // If it's not satisfied, we backtrack until we find the last decision we made to set something true, and change that to false.
             // All other entries we have decided on before then will be set true.
-            for (int j = sat_variables.size() - 1; j > 3; --j){
+            for (int j = sat_variables.size() - 1; j > 0; --j){
                 if (sat_variables[j] == 0){
                     // If the variable is 0, then we haven't seen it yet. Just leave it alone.
                     continue;
@@ -178,23 +183,22 @@ void* threaded_backtracker(void* vp_input){
                     continue;
                 }
                 if (sat_variables[j] == 1){
-                    // Set i = j - 1 because it'll get incremented in the next loop step. If we set i = j, it could return early (i.e. if i = last entry)
+                    // Set i = j - 1 because it'll get incremented in the next loop step. If we set i = j, it'll return early (i.e. if i = last entry)
                     i = j - 1;
                     sat_variables[j] = -1;
 
-                    // We also need to check if we are done traversing all possibilities, because that means this current thread was unable to find a solution.
-                    // To do this, check if j = end of vector AND if everything is equal (besides the first three predefined vals, and the dummy at [0]).
+                    // We also need to check if j = end of vector AND if everything is -1, because then we would have traversed the whole tree.
                     if ( j = sat_variables.size() - 1){
                         bool no_solutions = 1;
-                        for (int k = 4; k < sat_variables.size(); ++k){
-                            if (sat_variables[k] != sat_variables[4]){
+                        for (int k = 1; k < sat_variables.size(); ++k){
+                            if (sat_variables[k] != sat_variables[1]){
                                 no_solutions = 0;
                                 break;
                             }
                         }
                         if (no_solutions){
                             cout << "NO SOLUTIONS FOUND!" << endl;
-                            return 0;
+                            exit(0);
                         }
                     }
 
@@ -204,94 +208,6 @@ void* threaded_backtracker(void* vp_input){
             }
         }
     }
-    
-}
-
-
-int main(int argc, char *argv[]){
-    if (argc != 2){
-        cout << "\nTo use this program, call it along with the name of the input file. For example, ./sat_solve problem1\n" << "Input files must be in DIMACS format. For help, see: https://www.satcompetition.org/2009/format-benchmarks2009.html\n" << endl;
-        return 1;
-    }
-
-    SOLUTION_FOUND = 0;
-    char* filename = argv[1];
-    pair<vector<vector<int> >, int> inputs = input_reader(filename);
-
-    vector<vector<int> > clause_vect = inputs.first;
-    int num_vars = inputs.second;
-
-    /*
-    // DEBUGGING THE INPUT READER: 
-    for (int i = 0; i < clause_vect.size(); ++i){
-        for (int j = 0; j < clause_vect[i].size(); ++j){
-            cout << clause_vect[i][j] << ", ";
-        }
-        cout << endl;
-    }
-    cout << "and num_vars = " << num_vars << endl << endl; 
-    // END OF DEBUGGING THE INPUT READER CODE 
-    */
-
-
-    pthread_t threads[NUM_THREADS];
-
-    // sat_variables will be our vector which holds each variable's value. 0 means unset, -1 means false, 1 means true.
-    // Index i will correspond to variable i in the input; hence sat_variables[0] doesn't represent anything.
-    vector<vector<int> > sat_variables;
-
-    for (int i = 0; i < NUM_THREADS; ++i){
-        vector<int> curr_thread_sat_variables;
-
-        // To figure out the first three hard-coded values of each thread's sat variables, we convert i to binary.
-        bitset<3> bset(i);
-
-        // Push back the dummy in the first position:
-        curr_thread_sat_variables.push_back(0);
-
-        // Push back the first three characters
-        for (int j = 2; j >= 0; --j){
-            if (bset[j] == 0){
-                curr_thread_sat_variables.push_back( -1 );
-            } else {
-                curr_thread_sat_variables.push_back( bset[j] );
-            }
-        }
-
-        // Push back the remaining values as zeros. A total of num_vars + 1 values, as specified 2 lines above.
-        for (int j = 4; j < num_vars + 1; ++j){
-            curr_thread_sat_variables.push_back(0);
-        }
-
-        sat_variables.push_back(curr_thread_sat_variables);
-    }
-
-    for (int i = 0; i < NUM_THREADS; ++i){
-        
-        // DEBUGGING: making sure the sat_variables were built correctly
-        cout << "i = " << i << endl;
-        for (int j = 0; j < sat_variables[i].size(); ++j){
-            cout << sat_variables[i][j];
-        }
-        cout << endl;
-        pair< vector<int>, vector< vector< int> > >* threaded_backtracer_input = new pair< vector<int>, vector< vector< int> > >(sat_variables[i], clause_vect);
-        pthread_create( &threads[i], NULL, threaded_backtracker, static_cast<void*>(threaded_backtracer_input) );
-    }
-    cout << "PARENT: All threads created" << endl;
-    
-    
-    int num_threads_joined = 0;
-    while (!SOLUTION_FOUND){
-        for (int i = 0; i < NUM_THREADS; ++i){
-            int join = pthread_tryjoin_np(threads[i], NULL);
-            if (join != EBUSY){
-                ++num_threads_joined;
-                cout << "PARENT: Someone joined" << endl;
-            }
-        }
-    }
-    // If solution_found was set to true, the thread that found a solution will have outputted everything already.
-    // So we're done! :) 
 }
 
 
